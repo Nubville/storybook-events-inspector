@@ -1,15 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { AddonPanel, Button, EmptyTabContent, ScrollArea } from 'storybook/internal/components';
-import { useAddonState, useChannel, useParameter, useStorybookState } from 'storybook/manager-api';
+import { useChannel, useParameter, useStorybookState } from 'storybook/manager-api';
 import { styled, useTheme } from 'storybook/theming';
 import { ObjectInspector } from 'react-inspector';
 
-import { ADDON_ID, EVENTS, PARAM_KEY } from '../constants';
+import { EVENTS, PARAM_KEY } from '../constants';
 import { indexCatalog } from '../core/catalog';
 import type { DispatchResult, LogEntry } from '../core/types';
 import { effectiveFilter } from '../effectiveFilter';
 import type { EventsInspectorParameters } from '../types';
 import { DispatchForm } from './DispatchForm';
+import { addEntry, clearEntries, getEntries, subscribe } from './entriesStore';
 import { Flags } from './Flags';
 import { inspectorTheme } from './inspectorTheme';
 
@@ -85,19 +86,18 @@ export const Panel: React.FC<PanelProps> = ({ active }) => {
   const byName = useMemo(() => indexCatalog(catalog), [catalog]);
   const treeTheme = useMemo(() => inspectorTheme(theme), [theme]);
 
-  // Shared addon state, not local — PanelTitle.tsx (mounted separately, in
-  // the tab bar) reads this same slot for its live count. A single source of
-  // truth here instead of local state mirrored into a second shared value:
-  // two updates racing each other (entries changing, then a mirror syncing
-  // afterward) is exactly what caused the tab count to go stale after Clear
-  // during development. One state, so there's nothing left to race.
-  const [entries, setEntries] = useAddonState<LogEntry[]>(ADDON_ID, []);
+  // A manager-local store, not useAddonState — PanelTitle.tsx (mounted
+  // separately, in the tab bar) reads the same module for its live count, so
+  // there is still exactly one array and still nothing to race. What's gone is
+  // the channel sync useAddonState performs on every write, which was
+  // re-serializing the whole log into the preview iframe per captured event.
+  const entries = useSyncExternalStore(subscribe, getEntries);
   const [seen, setSeen] = useState<ReadonlySet<string>>(new Set());
   const [dispatchResult, setDispatchResult] = useState<DispatchResult | null>(null);
 
   const emit = useChannel({
     [EVENTS.LOG]: (entry: LogEntry) => {
-      setEntries((prev) => [entry, ...prev].slice(0, Math.max(1, maxEvents)));
+      addEntry(entry, maxEvents);
       setSeen((prev) => (prev.has(entry.name) ? prev : new Set(prev).add(entry.name)));
     },
     [EVENTS.DISPATCH_RESULT]: (result: DispatchResult) => setDispatchResult(result),
@@ -106,7 +106,7 @@ export const Panel: React.FC<PanelProps> = ({ active }) => {
   // A story switch invalidates everything below — same reason the built-in
   // Actions addon clears its log per story.
   useEffect(() => {
-    setEntries([]);
+    clearEntries();
     setSeen(new Set());
     setDispatchResult(null);
   }, [storyId]);
@@ -139,7 +139,7 @@ export const Panel: React.FC<PanelProps> = ({ active }) => {
               <> · narrowed to {params.catalogOnly && !params.filter?.length ? 'your catalog' : filter.length}</>
             )}
           </span>
-          <Button size="small" variant="ghost" onClick={() => setEntries([])} disabled={entries.length === 0}>
+          <Button size="small" variant="ghost" onClick={() => clearEntries()} disabled={entries.length === 0}>
             Clear
           </Button>
         </Head>

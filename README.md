@@ -395,10 +395,6 @@ Known gaps, in the order they're worth closing:
 - `safeDetail` flattens `Error`, `Map` and `Set` to `{}`, losing an error's
   message — the most useful thing a failing payload carries. (Placeholder
   tests are already in `src/core/safeDetail.test.ts`.)
-- The panel keeps its log in `useAddonState`, which syncs the whole array over
-  the manager/preview channel on every captured event. A manager-local store
-  read by both the panel and its tab title would do the same job with no
-  channel traffic.
 - `peerDependencies` on `storybook` is `*` while the code imports
   `storybook/internal/*`; it should be pinned to the majors actually supported.
 - Dev dependencies float on the `next` tag, so a fresh clone doesn't reproduce

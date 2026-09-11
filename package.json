@@ -1,6 +1,6 @@
 {
   "name": "storybook-events-inspector",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A Storybook panel (and standalone MCP server) that captures every custom event dispatched in a story with zero registration, flags shared names/retargeted origins/undocumented/not-composed events, and can dispatch a synthetic event back into the canvas.",
   "keywords": [
     "storybook-addon",
