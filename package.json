@@ -1,0 +1,123 @@
+{
+  "name": "wc-custom-events",
+  "version": "0.1.0",
+  "description": "A Storybook panel (and standalone MCP server) that logs every custom event your web components fire, flags shared names/retargeted origins/undocumented events, and can dispatch a synthetic event back into the canvas.",
+  "keywords": [
+    "storybook-addon",
+    "debugging",
+    "web-components",
+    "events",
+    "mcp"
+  ],
+  "license": "MIT",
+  "author": "Drew Garman <garman.andrew@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Nubville/wc-custom-events.git"
+  },
+  "homepage": "https://github.com/Nubville/wc-custom-events#readme",
+  "bugs": "https://github.com/Nubville/wc-custom-events/issues",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./preview": {
+      "types": "./dist/preview.d.ts",
+      "default": "./dist/preview.js"
+    },
+    "./manager": "./dist/manager.js",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "wc-custom-events-mcp": "./dist/server.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "*.js",
+    "*.d.ts"
+  ],
+  "scripts": {
+    "prebuild": "node -e \"fs.rmSync('./dist', { recursive: true, force: true })\"",
+    "build": "tsup",
+    "build-storybook": "storybook build",
+    "build:watch": "npm run build -- --watch",
+    "eject-ts": "zx scripts/eject-typescript.js",
+    "mcp": "node dist/server.js",
+    "format": "prettier --write .",
+    "lint": "eslint --cache .",
+    "lint:fix": "pnpm lint --fix",
+    "prerelease": "zx scripts/prepublish-checks.js",
+    "release": "npm run build && auto shipit",
+    "start": "run-p build:watch \"storybook --quiet\"",
+    "storybook": "storybook dev -p 6006",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@storybook/addon-docs": "next",
+    "@storybook/icons": "^2.0.0",
+    "@storybook/web-components-vite": "10.1.0-alpha.10",
+    "@types/node": "^20",
+    "@types/react": "^18.2.65",
+    "@types/react-dom": "^18.2.21",
+    "@vitejs/plugin-react": "^4.7.0",
+    "auto": "^11.3.0",
+    "boxen": "^8.0.1",
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-storybook": "next",
+    "lit": "^3.2.0",
+    "npm-run-all2": "^8.0.4",
+    "prettier": "^3.6.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "storybook": "next",
+    "ts-dedent": "^2.2.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.44.1",
+    "vite": "^7.0.5",
+    "zx": "^8.7.1"
+  },
+  "peerDependencies": {
+    "storybook": "*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bundler": {
+    "managerEntries": [
+      "src/manager.tsx"
+    ],
+    "previewEntries": [
+      "src/preview.ts",
+      "src/index.ts"
+    ],
+    "browserEntries": [
+      "src/core/browser-bundle.ts"
+    ],
+    "mcpEntries": [
+      "src/mcp/server.ts"
+    ]
+  },
+  "storybook": {
+    "displayName": "Events Inspector",
+    "supportedFrameworks": [
+      "web-components",
+      "html"
+    ],
+    "icon": "https://user-images.githubusercontent.com/321738/63501763-88dbf600-c4cc-11e9-96cd-94adadc2fd72.png"
+  },
+  "packageManager": "pnpm@10.22.0+sha512.bf049efe995b28f527fd2b41ae0474ce29186f7edcb3bf545087bd61fbbebb2bf75362d1307fda09c2d288e1e499787ac12d4fcb617a974718a6051f2eee741c",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "playwright": "^1.63.0",
+    "react-inspector": "^6.0.2",
+    "zod": "^4.6.2"
+  }
+}

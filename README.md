@@ -1,0 +1,295 @@
+# wc-custom-events
+
+A Storybook panel for design systems whose public API *is* their events: a
+component fires one event, the host owns the workflow. That means "is this
+thing working?" is almost always "did it fire, and with what?" — a question
+the browser gives you no good way to ask, and that a story-embedded debug
+element only answers for stories someone remembered to add it to.
+
+This addon answers it globally, with zero markup and **zero registration**,
+for every story:
+
+- **Capture** — sees every custom event any element dispatches, automatically.
+  No catalog required to see something; a catalog is optional annotation on
+  top of a stream that's already complete (see [How it works](#how-it-works)).
+- **Flags four traps that cost hours when hit blind**: an event dispatched
+  without `composed: true`, so it never left its shadow root and is invisible
+  to the *entire host app*, not just this panel (`not composed`) — a name
+  declared by more than one tag (`shared`) — `event.target` not matching the
+  true dispatch origin because a composed event crossed a shadow boundary
+  (`retargeted`) — and an event that fired but isn't in your catalog at all
+  (`undocumented`).
+- **Dispatch** — the reverse direction. Fire a synthetic event *at* the
+  rendered component from the panel, to check it responds the way its docs
+  claim, without writing a throwaway `play` function. The dispatch itself
+  shows up in the log too, like anything else.
+
+## Install
+
+```sh
+npm install --save-dev wc-custom-events
+```
+
+```ts
+// .storybook/main.ts
+const config = {
+  addons: ['wc-custom-events'],
+};
+```
+
+That's it — open the **Events inspector** panel next to Controls/Actions/Interactions
+and interact with any story. No catalog, no config, nothing to register.
+
+## Usage
+
+Everything below is optional narrowing/annotation on top of capture that
+already works with zero configuration.
+
+### Reducing noise: `filter` / `extra`
+
+```ts
+export const Default: Story = {
+  parameters: {
+    wcCustomEvents: {
+      filter: ['item-change'], // narrow the stream to just this name
+      extra: ['secret-event'], // add this back even though filter is set
+    },
+  },
+};
+```
+
+`filter` narrows; an empty (default) `filter` keeps everything. `extra` only
+does anything when `filter` is non-empty — it's how you say "just these,
+plus this one more."
+
+### Adding meaning: `catalog`
+
+```ts
+// .storybook/preview.ts
+import type { Preview } from '@storybook/web-components-vite';
+
+const preview: Preview = {
+  parameters: {
+    wcCustomEvents: {
+      // Typically generated from custom-elements.json — one entry per event
+      // name, with every tag that documents dispatching it.
+      catalog: [
+        { name: 'item-change', tags: ['search-input', 'sort-by'] },
+        { name: 'list-load-more', tags: ['pagination'] },
+      ],
+    },
+  },
+};
+
+export default preview;
+```
+
+Without a catalog, every captured event is (correctly) `undocumented` — you
+still see everything, you just don't get the `shared`/`undocumented`
+distinction. Add one when you want the panel to know what's actually part of
+your documented API surface.
+
+Parameters cascade normally (project → component → story), so a story can
+override the project default.
+
+### Parameters (`parameters.wcCustomEvents`)
+
+| Key         | Type                    | Default           | Effect                                                                    |
+| ----------- | ----------------------- | ------------------ | -------------------------------------------------------------------------- |
+| `catalog`   | `{ name, tags[] }[]`    | `[]`                | Annotates captured events with `shared`/`undocumented`. Doesn't gate capture. |
+| `filter`    | `string[]`              | `[]` (everything)   | Narrows the capture stream to just these names.                            |
+| `extra`     | `string[]`              | `[]`                | Adds names back on top of a non-empty `filter`. No-op when `filter` is empty. |
+| `maxEvents` | `number`                | `100`               | Rows kept in the panel before older ones drop.                             |
+| `compact`   | `boolean`               | `false`             | Hide the detail column.                                                    |
+| `label`     | `string`                | `'Events inspector'` | Panel heading.                                                              |
+
+## How it works
+
+**Agnostic by construction, not by convention.** Every custom event any
+element dispatches — in Lit, Stencil, or vanilla JS — goes through exactly one
+platform method: `EventTarget.prototype.dispatchEvent`. That's the same
+reason Redux DevTools doesn't need you to register action types: it wraps
+`store.dispatch`, the one place every action already funnels through. DOM
+custom events have the same kind of chokepoint; we patch it once, and get
+complete coverage with no catalog and no per-name listener registration.
+
+Two things fall out of intercepting the call site instead of listening on
+`window` for known names:
+
+- **Native events are excluded for free.** A real click is dispatched by the
+  browser engine itself, never through a JS call to `.dispatchEvent()` — so
+  patching it naturally filters out native noise. (We also skip any dispatched
+  type that doesn't contain a hyphen, the platform's own custom-event naming
+  convention, to filter out synthetic native-named dispatches from things like
+  testing libraries.)
+- **`composed: false` events become visible.** A `window`-level listener,
+  capture phase or not, never sees an event whose propagation path never
+  leaves its shadow root. Intercepting the dispatch call itself sees it
+  regardless — which is how the `not composed` flag exists at all, and it's
+  arguably the single highest-value one: that bug makes an event invisible to
+  the *entire host app*, not just this tool.
+
+### Core vs. adapter
+
+```
+src/core/               host-agnostic — no import from 'storybook/*' anywhere here
+  inspector.ts            the dispatchEvent patch + subscribe/notify
+  dispatch.ts              the reverse direction + "find the real custom element"
+  catalog.ts                shared/undocumented + filter matching (pure functions)
+  describe.ts, safeDetail.ts, types.ts
+  browser-bundle.ts        self-contained build of the above for injection into
+                             a page with no module loader — see the MCP server below
+
+src/preview.ts, src/manager.tsx,
+src/components/         Storybook adapter: preview.ts subscribes to core and
+                          forwards over the Storybook channel; the panel (React,
+                          same as the built-in Actions addon) renders what arrives.
+
+src/mcp/                MCP server adapter: session.ts drives a headless browser
+                          straight to a story's iframe.html (bypassing the Storybook
+                          manager/channel entirely) and injects core/browser-bundle.js
+                          directly — see "MCP server" below.
+```
+
+`core/` doesn't know Storybook exists — the MCP server adapter is proof, not
+just a promise: it reuses `inspector.ts`, `dispatch.ts`, and `catalog.ts`
+completely unchanged, against a page that never loads the Storybook manager at
+all. The same bundle could equally back a bookmarklet or a browser-extension
+content script on a *live, deployed* page — catching real user flows, not
+just what a Storybook interaction test exercises.
+
+**What this deliberately doesn't cover**: framework-level reactivity (Lit
+Signals, MobX observables, Vue refs, …) isn't a DOM API — there's no single
+chokepoint to patch generically the way `dispatchEvent` is one for custom
+events, and each library's internals are shaped differently. Watching one
+would mean a separate, purpose-built `core/`-style adapter for that specific
+library, added only when a real component actually needs it — not a
+speculative addition now.
+
+## MCP server — for AI agents
+
+A standalone MCP server, separate from Storybook's own `@storybook/addon-mcp`.
+That's deliberate, not a missed integration: as of writing, Storybook's MCP
+server has no extension point for a third-party addon to register its own
+tools, and its "docs" toolset (component manifest lookup) doesn't cover
+web-components projects yet. So this exposes this addon's own domain
+directly — the same capture/dispatch loop the Storybook panel gives a human,
+callable by an agent.
+
+### Setup
+
+```jsonc
+// .mcp.json (project-level MCP config, e.g. for Claude Code)
+{
+  "mcpServers": {
+    "wc-custom-events": {
+      "command": "npx",
+      "args": [
+        "wc-custom-events-mcp",
+        "--storybook-url", "http://localhost:6006",
+        "--catalog", "./custom-elements-catalog.json" // optional
+      ]
+    }
+  }
+}
+```
+
+Flags: `--storybook-url` (default `http://localhost:6006`) and an optional
+`--catalog <path>` — a JSON file of the same `{ name, tags }[]` shape as the
+addon's own `parameters.wcCustomEvents.catalog`, used for the same
+`shared`/`undocumented` annotation. Omit it and everything is (correctly)
+`undocumented` — capture itself is unaffected either way.
+
+Storybook has to already be running (`pnpm storybook` or equivalent) — the
+server drives a real, separate headless browser against it, it doesn't start
+Storybook itself.
+
+### Tools
+
+| Tool | Does |
+| --- | --- |
+| `list_stories` | Every story in the running Storybook, so an agent can find an id without guessing. |
+| `open_story` | Load a story by id and start capturing. Validates the id against the real index first — a typo'd id fails clearly instead of silently loading Storybook's own "not found" page. |
+| `click` | Click a real element by CSS selector and let whatever it fires get captured naturally — "open the menu, see it respond," run by an agent instead of a human. |
+| `dispatch_event` | The reverse direction: fire a synthetic event at the story's rendered element without a UI trigger to click. Also captured, like anything else. |
+| `get_events` | Everything captured so far — name, origin tag, detail, and the same flags the panel shows (`undocumented`/`shared`/`retargeted`/`notComposed`). |
+| `clear_events` | Empty the buffer without reloading the story. |
+
+Each tool's own `description` (what an agent actually reads to decide when to
+use it) has more detail and an example than this table — see `src/mcp/server.ts`.
+The server also sets top-level `instructions` summarizing the whole loop.
+
+### Example loop
+
+```
+list_stories                                    → find "my-design-system--menu"
+open_story  { storyId: "my-design-system--menu" }
+click       { selector: "my-menu-trigger" }
+get_events  {}
+→ [{ name: "menu-open", origin: "my-menu", detail: {...}, undocumented: false, ... }]
+```
+
+Or the reverse direction — checking a component responds to a command event
+without a UI trigger for it:
+
+```
+dispatch_event { name: "menu-close", detail: { reason: "escape" } }
+get_events     {}
+→ the dispatch itself, captured like anything else, plus whatever the
+  component did in response
+```
+
+### Local development / testing it yourself
+
+```sh
+pnpm build
+node dist/server.js --storybook-url http://localhost:6006
+```
+
+It speaks MCP over stdio — point an MCP client at that command, or use the
+SDK's own `Client`/`StdioClientTransport` to script it directly, the same way
+you'd script any other MCP server.
+
+## Demo / local development
+
+`src/demo/` is a self-contained pair of Lit fixtures (not part of the
+published addon) used by this repo's own Storybook to exercise every flag and
+the dispatch round-trip:
+
+```sh
+pnpm install
+pnpm build          # compile src/manager.tsx, src/preview.ts → dist/
+pnpm storybook      # http://localhost:6006 — see "Demo" in the sidebar
+```
+
+- **`Demo/Buttons`** — zero `wcCustomEvents` parameters. Both fixtures fire
+  the shared `demo-change` name (flagged `shared`); shift-click the button to
+  also fire `demo-secret`, which isn't in the catalog and still shows up,
+  flagged `undocumented`.
+- **`Demo/Narrowed`** — same fixtures, `filter: ['demo-change']` set, so
+  `demo-secret` from a shift-click is captured but not shown.
+- **`Demo/ToggleOnly`** — a single element alone in the canvas, for trying the
+  panel's Dispatch form against it directly.
+
+## Status
+
+Young — built to validate the idea, not yet published. Metadata in
+`package.json` (`author`, `repository`, GitHub Actions release workflow) is
+still templated from the addon-kit and needs filling in before a real release.
+
+One thing worth reconsidering before a real release: the MCP server pulls in
+Playwright (a genuinely heavy dependency — it downloads browser binaries) as
+a dependency of this *same* package, so installing the addon for its
+Storybook panel alone currently drags that along too. Splitting the MCP
+server into its own package (`wc-custom-events-mcp`, depending on this one
+for `core/`) before publishing would avoid forcing that weight on someone who
+only wants the panel.
+
+## Contributing
+
+Issues and PRs welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md) for dev
+setup, how changes here actually get verified, and what's in/out of scope.
+
+## License
+
+[MIT](./LICENSE) © Drew Garman

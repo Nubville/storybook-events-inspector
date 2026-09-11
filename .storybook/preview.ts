@@ -1,0 +1,24 @@
+import type { Preview } from '@storybook/web-components-vite';
+
+import { DEMO_EVENT_CATALOG } from '../src/demo/catalog';
+
+const preview: Preview = {
+  parameters: {
+    controls: {
+      matchers: {
+        color: /(background|color)$/i,
+        date: /Date$/,
+      },
+    },
+    // Project-wide default for this addon. A story can narrow it further with
+    // `parameters.wcCustomEvents.filter` / `.extra`.
+    wcCustomEvents: {
+      catalog: DEMO_EVENT_CATALOG,
+    },
+  },
+  initialGlobals: {
+    background: { value: 'light' },
+  },
+};
+
+export default preview;
