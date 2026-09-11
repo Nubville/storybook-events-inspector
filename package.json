@@ -1,7 +1,7 @@
 {
-  "name": "wc-custom-events",
+  "name": "storybook-events-inspector",
   "version": "0.1.0",
-  "description": "A Storybook panel (and standalone MCP server) that logs every custom event your web components fire, flags shared names/retargeted origins/undocumented events, and can dispatch a synthetic event back into the canvas.",
+  "description": "A Storybook panel (and standalone MCP server) that captures every custom event dispatched in a story with zero registration, flags shared names/retargeted origins/undocumented/not-composed events, and can dispatch a synthetic event back into the canvas.",
   "keywords": [
     "storybook-addon",
     "debugging",
@@ -13,10 +13,10 @@
   "author": "Drew Garman <garman.andrew@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Nubville/wc-custom-events.git"
+    "url": "https://github.com/Nubville/storybook-events-inspector.git"
   },
-  "homepage": "https://github.com/Nubville/wc-custom-events#readme",
-  "bugs": "https://github.com/Nubville/wc-custom-events/issues",
+  "homepage": "https://github.com/Nubville/storybook-events-inspector#readme",
+  "bugs": "https://github.com/Nubville/storybook-events-inspector/issues",
   "type": "module",
   "exports": {
     ".": {
@@ -31,7 +31,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "wc-custom-events-mcp": "./dist/server.js"
+    "storybook-events-inspector-mcp": "./dist/server.js"
   },
   "files": [
     "dist/**/*",
@@ -56,6 +56,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "devDependencies": {
+    "@auto-it/conventional-commits": "11.3.6",
+    "@auto-it/released": "11.3.6",
     "@eslint/js": "^9.36.0",
     "@storybook/addon-docs": "next",
     "@storybook/icons": "^2.0.0",

@@ -6,7 +6,7 @@
  * component fires (or responds to) the right event, the same loop the
  * Storybook panel gives a human.
  *
- * Usage: wc-custom-events-mcp [--storybook-url <url>] [--catalog <path.json>]
+ * Usage: storybook-events-inspector-mcp [--storybook-url <url>] [--catalog <path.json>]
  */
 import { readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -38,7 +38,7 @@ const catalog = loadCatalog(catalogPath);
 const session = new Session(storybookUrl, catalog);
 
 const server = new McpServer(
-  { name: 'wc-custom-events', version: '0.1.0' },
+  { name: 'storybook-events-inspector', version: '0.1.0' },
   {
     instructions: `Debug a web component's custom events against a running Storybook (default ${storybookUrl}).
 

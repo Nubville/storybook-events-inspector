@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AddonPanel, Button, EmptyTabContent, ScrollArea } from 'storybook/internal/components';
-import { useChannel, useParameter, useStorybookState } from 'storybook/manager-api';
+import { useAddonState, useChannel, useParameter, useStorybookState } from 'storybook/manager-api';
 import { styled, useTheme } from 'storybook/theming';
 import { ObjectInspector } from 'react-inspector';
 
-import { EVENTS, PARAM_KEY } from '../constants';
+import { ADDON_ID, EVENTS, PARAM_KEY } from '../constants';
 import { indexCatalog } from '../core/catalog';
 import type { DispatchResult, LogEntry } from '../core/types';
 import { effectiveFilter } from '../effectiveFilter';
-import type { WcCustomEventsParameters } from '../types';
+import type { EventsInspectorParameters } from '../types';
 import { DispatchForm } from './DispatchForm';
 import { Flags } from './Flags';
 import { inspectorTheme } from './inspectorTheme';
@@ -17,7 +17,7 @@ interface PanelProps {
   active: boolean;
 }
 
-const EMPTY_PARAMS: WcCustomEventsParameters = {};
+const EMPTY_PARAMS: EventsInspectorParameters = {};
 
 const Head = styled.div(({ theme }) => ({
   display: 'flex',
@@ -74,7 +74,7 @@ const FiredBy = styled.span(({ theme }) => ({
 
 export const Panel: React.FC<PanelProps> = ({ active }) => {
   const theme = useTheme();
-  const params = useParameter<WcCustomEventsParameters>(PARAM_KEY, EMPTY_PARAMS);
+  const params = useParameter<EventsInspectorParameters>(PARAM_KEY, EMPTY_PARAMS);
   const { storyId } = useStorybookState();
 
   const catalog = params.catalog ?? [];
@@ -85,7 +85,13 @@ export const Panel: React.FC<PanelProps> = ({ active }) => {
   const byName = useMemo(() => indexCatalog(catalog), [catalog]);
   const treeTheme = useMemo(() => inspectorTheme(theme), [theme]);
 
-  const [entries, setEntries] = useState<LogEntry[]>([]);
+  // Shared addon state, not local — PanelTitle.tsx (mounted separately, in
+  // the tab bar) reads this same slot for its live count. A single source of
+  // truth here instead of local state mirrored into a second shared value:
+  // two updates racing each other (entries changing, then a mirror syncing
+  // afterward) is exactly what caused the tab count to go stale after Clear
+  // during development. One state, so there's nothing left to race.
+  const [entries, setEntries] = useAddonState<LogEntry[]>(ADDON_ID, []);
   const [seen, setSeen] = useState<ReadonlySet<string>>(new Set());
   const [dispatchResult, setDispatchResult] = useState<DispatchResult | null>(null);
 

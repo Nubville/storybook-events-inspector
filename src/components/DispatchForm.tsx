@@ -93,13 +93,13 @@ export const DispatchForm: React.FC<DispatchFormProps> = ({ catalog, storyId, em
     <Form onSubmit={send} style={{ borderBottom: `1px solid ${theme.appBorderColor}` }}>
       <Row>
         <NameField
-          list="wc-custom-events-catalog"
+          list="storybook-events-inspector-catalog"
           placeholder="event name, e.g. item-change"
           value={name}
           onChange={(e) => setName(e.target.value)}
           aria-label="Event name to dispatch"
         />
-        <datalist id="wc-custom-events-catalog">
+        <datalist id="storybook-events-inspector-catalog">
           {catalog.map((entry) => (
             <option key={entry.name} value={entry.name} />
           ))}

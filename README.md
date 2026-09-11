@@ -1,4 +1,4 @@
-# wc-custom-events
+# storybook-events-inspector
 
 A Storybook panel for design systems whose public API *is* their events: a
 component fires one event, the host owns the workflow. That means "is this
@@ -27,13 +27,13 @@ for every story:
 ## Install
 
 ```sh
-npm install --save-dev wc-custom-events
+npm install --save-dev storybook-events-inspector
 ```
 
 ```ts
 // .storybook/main.ts
 const config = {
-  addons: ['wc-custom-events'],
+  addons: ['storybook-events-inspector'],
 };
 ```
 
@@ -50,7 +50,7 @@ already works with zero configuration.
 ```ts
 export const Default: Story = {
   parameters: {
-    wcCustomEvents: {
+    eventsInspector: {
       filter: ['item-change'], // narrow the stream to just this name
       extra: ['secret-event'], // add this back even though filter is set
     },
@@ -70,7 +70,7 @@ import type { Preview } from '@storybook/web-components-vite';
 
 const preview: Preview = {
   parameters: {
-    wcCustomEvents: {
+    eventsInspector: {
       // Typically generated from custom-elements.json — one entry per event
       // name, with every tag that documents dispatching it.
       catalog: [
@@ -92,7 +92,7 @@ your documented API surface.
 Parameters cascade normally (project → component → story), so a story can
 override the project default.
 
-### Parameters (`parameters.wcCustomEvents`)
+### Parameters (`parameters.eventsInspector`)
 
 | Key         | Type                    | Default           | Effect                                                                    |
 | ----------- | ----------------------- | ------------------ | -------------------------------------------------------------------------- |
@@ -182,10 +182,10 @@ callable by an agent.
 // .mcp.json (project-level MCP config, e.g. for Claude Code)
 {
   "mcpServers": {
-    "wc-custom-events": {
+    "storybook-events-inspector": {
       "command": "npx",
       "args": [
-        "wc-custom-events-mcp",
+        "storybook-events-inspector-mcp",
         "--storybook-url", "http://localhost:6006",
         "--catalog", "./custom-elements-catalog.json" // optional
       ]
@@ -196,7 +196,7 @@ callable by an agent.
 
 Flags: `--storybook-url` (default `http://localhost:6006`) and an optional
 `--catalog <path>` — a JSON file of the same `{ name, tags }[]` shape as the
-addon's own `parameters.wcCustomEvents.catalog`, used for the same
+addon's own `parameters.eventsInspector.catalog`, used for the same
 `shared`/`undocumented` annotation. Omit it and everything is (correctly)
 `undocumented` — capture itself is unaffected either way.
 
@@ -262,7 +262,7 @@ pnpm build          # compile src/manager.tsx, src/preview.ts → dist/
 pnpm storybook      # http://localhost:6006 — see "Demo" in the sidebar
 ```
 
-- **`Demo/Buttons`** — zero `wcCustomEvents` parameters. Both fixtures fire
+- **`Demo/Buttons`** — zero `eventsInspector` parameters. Both fixtures fire
   the shared `demo-change` name (flagged `shared`); shift-click the button to
   also fire `demo-secret`, which isn't in the catalog and still shows up,
   flagged `undocumented`.
@@ -281,7 +281,7 @@ One thing worth reconsidering before a real release: the MCP server pulls in
 Playwright (a genuinely heavy dependency — it downloads browser binaries) as
 a dependency of this *same* package, so installing the addon for its
 Storybook panel alone currently drags that along too. Splitting the MCP
-server into its own package (`wc-custom-events-mcp`, depending on this one
+server into its own package (`storybook-events-inspector-mcp`, depending on this one
 for `core/`) before publishing would avoid forcing that weight on someone who
 only wants the panel.
 

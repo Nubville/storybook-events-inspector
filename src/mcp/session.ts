@@ -16,7 +16,7 @@ import type { DispatchOptions, DispatchResult, EventCatalogEntry, LogEntry } fro
 declare global {
   interface Window {
     /** Bound via page.exposeFunction — proxies a captured entry back to the Node session. */
-    __wcReportEntry?: (entry: LogEntry) => void;
+    __reportEntry?: (entry: LogEntry) => void;
   }
 }
 
@@ -69,7 +69,7 @@ export class Session {
     const page = await this.browser.newPage();
     // Registered once; Playwright re-applies both on every subsequent
     // navigation within this page, so openStory() doesn't need to redo them.
-    await page.exposeFunction('__wcReportEntry', (entry: LogEntry) => {
+    await page.exposeFunction('__reportEntry', (entry: LogEntry) => {
       this.entries.push(this.annotate(entry));
       if (this.entries.length > this.maxEntries) this.entries.splice(0, this.entries.length - this.maxEntries);
     });
@@ -113,7 +113,7 @@ export class Session {
     this.currentStoryId = storyId;
     this.entries = [];
     await page.evaluate(() => {
-      window.__wcCustomEvents?.start((entry) => window.__wcReportEntry?.(entry));
+      window.__eventsInspector?.start((entry) => window.__reportEntry?.(entry));
     });
   }
 
@@ -142,7 +142,7 @@ export class Session {
     this.requireStoryOpen();
     const page = await this.getPage();
     const result = await page.evaluate(
-      (args: { name: string; options: DispatchOptions }) => window.__wcCustomEvents?.dispatch(args.name, args.options),
+      (args: { name: string; options: DispatchOptions }) => window.__eventsInspector?.dispatch(args.name, args.options),
       { name, options },
     );
     // Give the capture-side exposeFunction round-trip a moment before the

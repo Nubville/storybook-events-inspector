@@ -1,0 +1,4 @@
+{
+  "plugins": ["npm", "conventional-commits", "released"],
+  "noVersionPrefix": false
+}

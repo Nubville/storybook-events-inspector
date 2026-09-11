@@ -2,11 +2,11 @@ export type { EventCatalogEntry, LogEntry, DispatchResult } from './core/types';
 import type { EventCatalogEntry } from './core/types';
 
 /**
- * Set via `parameters.wcCustomEvents` in `.storybook/preview.ts` (project-wide) and/or
+ * Set via `parameters.eventsInspector` in `.storybook/preview.ts` (project-wide) and/or
  * narrowed per component/story — parameters cascade, so a story's `filter` naturally
  * overrides the project default.
  */
-export interface WcCustomEventsParameters {
+export interface EventsInspectorParameters {
   /** Annotates captured events — does NOT gate what's captured. Omit and everything is `undocumented`. */
   readonly catalog?: readonly EventCatalogEntry[];
   /** Narrows the (already-complete) capture stream to just these names. Empty/omitted keeps everything. */

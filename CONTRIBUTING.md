@@ -6,8 +6,8 @@ and PRs are welcome, but response times may vary.
 ## Setup
 
 ```sh
-git clone https://github.com/Nubville/wc-custom-events.git
-cd wc-custom-events
+git clone https://github.com/Nubville/storybook-events-inspector.git
+cd storybook-events-inspector
 pnpm install
 ```
 
@@ -35,6 +35,24 @@ To exercise the MCP server directly without a real MCP client, use the SDK's
 own `Client` + `StdioClientTransport` to script calls against
 `dist/server.js` — see the MCP section of the README for the shape.
 
+## Commit messages
+
+This repo uses [Conventional Commits](https://www.conventionalcommits.org/),
+and releases (`auto shipit`, via the `release.yml` workflow — manual-trigger
+only, not automatic) compute the version bump from them, via `auto`'s
+`conventional-commits` plugin (`.autorc`). No PR labels to remember to set —
+just write the commit message honestly and the release tooling gets it right:
+
+- `fix: ...` → patch (`0.1.0` → `0.1.1`)
+- `feat: ...` → minor (`0.1.0` → `0.2.0`)
+- `feat!: ...` or a `BREAKING CHANGE:` footer → major (`0.1.0` → `1.0.0`)
+- `chore:`, `docs:`, `refactor:`, `test:`, `ci:` → no release on their own
+
+Verified directly, not assumed: `npx auto version` (with `GH_TOKEN` set —
+`export GH_TOKEN=$(gh auth token)` works from a `gh`-authenticated shell)
+prints what the *next* release would compute from the commits since the last
+one, without publishing anything.
+
 ## Reporting a bug
 
 Please include:
@@ -48,13 +66,15 @@ Please include:
 ## Proposing a change
 
 Small fixes: open a PR directly. Anything that changes the shape of
-`parameters.wcCustomEvents`, the MCP tool contracts, or what `core/` exposes:
+`parameters.eventsInspector`, the MCP tool contracts, or what `core/` exposes:
 please open an issue first to talk through it — those are the parts other
 people's config/scripts end up depending on.
 
 ## Scope
 
-This addon's job is custom DOM events (`dispatchEvent`) on web components —
+This addon's job is custom DOM events (`dispatchEvent`) — any element, not
+just web components, though that's the primary motivating use case (see
+the README's opening section). PRs adding
 see the README's "What this deliberately doesn't cover" note. PRs adding
 framework-specific reactivity tracking (React callbacks, Vue `$emit`, Lit
 Signals, etc.) are probably out of scope for this package; happy to discuss

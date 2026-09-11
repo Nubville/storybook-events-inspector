@@ -15,7 +15,7 @@ export default meta;
 type Story = StoryObj;
 
 /**
- * Zero `wcCustomEvents` parameters here — capture is agnostic by default, no
+ * Zero `eventsInspector` parameters here — capture is agnostic by default, no
  * catalog or registration required. Both fixtures fire the shared
  * `demo-change` name (watch it get flagged `shared`); shift-click the button
  * to also fire `demo-secret`, which isn't in `.storybook/preview.ts`'s
@@ -38,7 +38,7 @@ export const Buttons: Story = {
  */
 export const Narrowed: Story = {
   parameters: {
-    wcCustomEvents: { filter: ['demo-change'] },
+    eventsInspector: { filter: ['demo-change'] },
   },
   render: () => html`
     <div style="display: flex; gap: 1rem; align-items: center; font-family: sans-serif;">
@@ -57,7 +57,7 @@ export const Narrowed: Story = {
  */
 export const ScopedToCatalog: Story = {
   parameters: {
-    wcCustomEvents: { catalogOnly: true },
+    eventsInspector: { catalogOnly: true },
   },
   render: () => html`
     <div style="display: flex; gap: 1rem; align-items: center; font-family: sans-serif;">

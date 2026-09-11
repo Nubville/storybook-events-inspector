@@ -11,8 +11,8 @@ const preview: Preview = {
       },
     },
     // Project-wide default for this addon. A story can narrow it further with
-    // `parameters.wcCustomEvents.filter` / `.extra`.
-    wcCustomEvents: {
+    // `parameters.eventsInspector.filter` / `.extra`.
+    eventsInspector: {
       catalog: DEMO_EVENT_CATALOG,
     },
   },

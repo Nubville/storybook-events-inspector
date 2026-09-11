@@ -16,7 +16,7 @@ interface FlagsProps {
  *   not composed  Never left its shadow root — invisible to anything outside it,
  *                 including the host app itself, not just this panel. Usually a
  *                 missing `composed: true` on the dispatch.
- *   undocumented  Not declared in the catalog passed via `parameters.wcCustomEvents.catalog`
+ *   undocumented  Not declared in the catalog passed via `parameters.eventsInspector.catalog`
  *                 — not part of the supported surface, nothing should depend on it.
  *   shared        More than one tag declares this event name, so a listener bound
  *                 on a shared ancestor can't tell which control fired without also

@@ -61,8 +61,8 @@ const bridge: BrowserBridge = {
 
 declare global {
   interface Window {
-    __wcCustomEvents?: BrowserBridge;
+    __eventsInspector?: BrowserBridge;
   }
 }
 
-window.__wcCustomEvents = bridge;
+window.__eventsInspector = bridge;

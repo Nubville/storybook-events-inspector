@@ -18,7 +18,7 @@ import { onCustomEvent } from './core/inspector';
 import { safeDetail } from './core/safeDetail';
 import type { CapturedEvent, LogEntry } from './core/types';
 import { effectiveFilter } from './effectiveFilter';
-import type { DispatchRequest, WcCustomEventsParameters } from './types';
+import type { DispatchRequest, EventsInspectorParameters } from './types';
 
 let seq = 0;
 
@@ -36,8 +36,8 @@ function toLogEntry(captured: CapturedEvent): LogEntry {
   };
 }
 
-export const withCustomEvents: DecoratorFunction = (storyFn, context) => {
-  const params = (context.parameters?.[PARAM_KEY] ?? {}) as WcCustomEventsParameters;
+export const withEventsInspector: DecoratorFunction = (storyFn, context) => {
+  const params = (context.parameters?.[PARAM_KEY] ?? {}) as EventsInspectorParameters;
   const filter = effectiveFilter(params);
   const extra = params.extra ?? [];
   const canvasElement = context.canvasElement;
@@ -68,7 +68,7 @@ export const withCustomEvents: DecoratorFunction = (storyFn, context) => {
 };
 
 const preview: ProjectAnnotations<Renderer> = {
-  decorators: [withCustomEvents],
+  decorators: [withEventsInspector],
 };
 
 export default preview;
