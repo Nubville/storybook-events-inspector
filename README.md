@@ -197,6 +197,8 @@ callable by an agent.
 
 ### Setup
 
+Requires **Node 20.19+**.
+
 The server's runtime dependencies are **optional peer dependencies**, so
 installing this package for its Storybook panel alone doesn't pull down
 Playwright and a browser binary the panel never uses. Install them when you
@@ -210,13 +212,21 @@ npx playwright install chromium
 (Run the server without them and it prints exactly that, rather than failing
 with a module-resolution stack trace.)
 
+Then check it starts before wiring any client to it — it should print the
+missing-dependency message or simply wait on stdio, not crash:
+
+```sh
+npx storybook-events-inspector-mcp --storybook-url http://localhost:6006
+```
+
 ```jsonc
 // .mcp.json (project-level MCP config, e.g. for Claude Code)
 {
   "mcpServers": {
     "storybook-events-inspector": {
-      "command": "storybook-events-inspector-mcp",
+      "command": "npx",
       "args": [
+        "storybook-events-inspector-mcp",
         "--storybook-url",
         "http://localhost:6006",
         "--catalog",
@@ -227,26 +237,86 @@ with a module-resolution stack trace.)
 }
 ```
 
-Flags: `--storybook-url` (default `http://localhost:6006`) and an optional
-`--catalog <path>` — a JSON file of the same `{ name, tags }[]` shape as the
-addon's own `parameters.eventsInspector.catalog`, used for the same
-`shared`/`undocumented` annotation. Omit it and everything is (correctly)
-`undocumented` — capture itself is unaffected either way.
+`npx` here does **not** download anything: the package is already a local
+devDependency, and `npx` resolves `node_modules/.bin` first. It's needed
+because that directory isn't on `PATH`, so an MCP client spawning the bare
+command name would fail with `ENOENT`.
+
+Flags:
+
+- `--storybook-url` (default `http://localhost:6006`) — set this if your
+  Storybook runs anywhere else; the server won't discover it.
+- `--catalog <path>` (optional) — a JSON file of the same `{ name, tags }[]`
+  shape as the addon's own `parameters.eventsInspector.catalog`, used for the
+  same `shared`/`undocumented` annotation. Relative paths resolve from the
+  working directory the MCP client launches the server in, which is normally
+  your project root; use an absolute path if your client differs. Omit it and
+  everything is (correctly) `undocumented` — capture itself is unaffected
+  either way. See [Generating the catalog](#generating-the-catalog) below.
 
 Storybook has to already be running (`pnpm storybook` or equivalent) — the
 server drives a real, separate headless browser against it, it doesn't start
 Storybook itself.
 
+### Generating the catalog
+
+The `{ name, tags }[]` shape is a direct projection of a Custom Elements
+Manifest, so you don't write it by hand. This reads `custom-elements.json` and
+writes the catalog the addon and the MCP server both accept:
+
+```js
+// scripts/events-catalog.mjs
+import { readFileSync, writeFileSync } from 'node:fs';
+
+const manifest = JSON.parse(readFileSync(process.argv[2] ?? 'custom-elements.json', 'utf8'));
+const byName = new Map();
+
+for (const module of manifest.modules ?? []) {
+  for (const decl of module.declarations ?? []) {
+    if (!decl.tagName) continue; // skip non-element declarations
+    for (const event of decl.events ?? []) {
+      if (!byName.has(event.name)) byName.set(event.name, new Set());
+      byName.get(event.name).add(decl.tagName);
+    }
+  }
+}
+
+const catalog = [...byName]
+  .map(([name, tags]) => ({ name, tags: [...tags].sort() }))
+  .sort((a, b) => a.name.localeCompare(b.name));
+
+writeFileSync(process.argv[3] ?? 'events-catalog.json', JSON.stringify(catalog, null, 2) + '\n');
+console.error(`Wrote ${catalog.length} event(s).`);
+```
+
+```sh
+node scripts/events-catalog.mjs custom-elements.json events-catalog.json
+```
+
+An event declared by more than one tag naturally ends up with more than one
+entry in `tags`, which is exactly what produces the `shared` flag:
+
+```json
+[
+  { "name": "item-change", "tags": ["my-button", "my-toggle"] },
+  { "name": "my-click", "tags": ["my-button"] }
+]
+```
+
+The same file works in both places — pass it to the MCP server with
+`--catalog`, or import it in `.storybook/preview.ts` as
+`parameters.eventsInspector.catalog`.
+
 ### Tools
 
-| Tool             | Does                                                                                                                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_stories`   | Every story in the running Storybook, so an agent can find an id without guessing.                                                                                              |
-| `open_story`     | Load a story by id and start capturing. Validates the id against the real index first — a typo'd id fails clearly instead of silently loading Storybook's own "not found" page. |
-| `click`          | Click a real element by CSS selector and let whatever it fires get captured naturally — "open the menu, see it respond," run by an agent instead of a human.                    |
-| `dispatch_event` | The reverse direction: fire a synthetic event at the story's rendered element without a UI trigger to click. Also captured, like anything else.                                 |
-| `get_events`     | Everything captured so far — name, origin tag, detail, and the same flags the panel shows (`undocumented`/`shared`/`retargeted`/`notComposed`).                                 |
-| `clear_events`   | Empty the buffer without reloading the story.                                                                                                                                   |
+| Tool             | Does                                                                                                                                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_stories`   | Every story in the running Storybook, so an agent can find an id without guessing.                                                                                                                                      |
+| `open_story`     | Load a story by id and start capturing. Validates the id against the real index first — a typo'd id fails clearly instead of silently loading Storybook's own "not found" page.                                         |
+| `click`          | Click a real element by CSS selector and let whatever it fires get captured naturally — "open the menu, see it respond," run by an agent instead of a human.                                                            |
+| `dispatch_event` | The reverse direction: fire a synthetic event at the story's rendered element without a UI trigger to click. Also captured, like anything else.                                                                         |
+| `get_events`     | Everything captured so far — name, the target that dispatched (a tag name, or `document`/`window`/an event bus class), detail, and the same flags the panel shows (`undocumented`/`shared`/`retargeted`/`notComposed`). |
+| `clear_events`   | Empty the buffer without reloading the story.                                                                                                                                                                           |
 
 Each tool's own `description` (what an agent actually reads to decide when to
 use it) has more detail and an example than this table — see `src/mcp/server.ts`.
