@@ -20,11 +20,13 @@ export default defineConfig(async () => {
     previewEntries = [],
     browserEntries = [],
     mcpEntries = [],
+    cliEntries = [],
   } = packageJson.bundler as {
     managerEntries?: string[];
     previewEntries?: string[];
     browserEntries?: string[];
     mcpEntries?: string[];
+    cliEntries?: string[];
   };
 
   const commonConfig: Options = {
@@ -106,6 +108,25 @@ export default defineConfig(async () => {
       target: NODE_TARGET,
       splitting: false,
       external: ['playwright', '@modelcontextprotocol/sdk', 'zod'],
+      banner: { js: '#!/usr/bin/env node' },
+    });
+  }
+
+  /*
+   cli entries are dependency-free Node bins for project setup (catalog
+   generation, MCP registration, skill scaffolding). Nothing is externalized
+   because nothing is imported beyond node: builtins — that's deliberate, so
+   this stays runnable via npx without dragging the MCP server's optional peer
+   dependencies along.
+  */
+  if (cliEntries.length) {
+    configs.push({
+      ...commonConfig,
+      entry: cliEntries,
+      platform: 'node',
+      target: NODE_TARGET,
+      splitting: false,
+      external: [],
       banner: { js: '#!/usr/bin/env node' },
     });
   }

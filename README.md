@@ -260,41 +260,24 @@ Storybook itself.
 
 ### Generating the catalog
 
-The `{ name, tags }[]` shape is a direct projection of a Custom Elements
-Manifest, so you don't write it by hand. This reads `custom-elements.json` and
-writes the catalog the addon and the MCP server both accept:
-
-```js
-// scripts/events-catalog.mjs
-import { readFileSync, writeFileSync } from 'node:fs';
-
-const manifest = JSON.parse(readFileSync(process.argv[2] ?? 'custom-elements.json', 'utf8'));
-const byName = new Map();
-
-for (const module of manifest.modules ?? []) {
-  for (const decl of module.declarations ?? []) {
-    if (!decl.tagName) continue; // skip non-element declarations
-    for (const event of decl.events ?? []) {
-      if (!byName.has(event.name)) byName.set(event.name, new Set());
-      byName.get(event.name).add(decl.tagName);
-    }
-  }
-}
-
-const catalog = [...byName]
-  .map(([name, tags]) => ({ name, tags: [...tags].sort() }))
-  .sort((a, b) => a.name.localeCompare(b.name));
-
-writeFileSync(process.argv[3] ?? 'events-catalog.json', JSON.stringify(catalog, null, 2) + '\n');
-console.error(`Wrote ${catalog.length} event(s).`);
-```
+`shared` and `undocumented` only mean anything with a catalog, and the
+`{ name, tags }[]` shape is a direct projection of a Custom Elements
+Manifest — so it's generated, never hand-written:
 
 ```sh
-node scripts/events-catalog.mjs custom-elements.json events-catalog.json
+npx storybook-events-inspector-setup catalog
 ```
 
-An event declared by more than one tag naturally ends up with more than one
-entry in `tags`, which is exactly what produces the `shared` flag:
+It finds your manifest via `package.json`'s `customElements` field (the CEM
+spec's own pointer), falling back to `./custom-elements.json`,
+`./dist/custom-elements.json` and `./custom-elements-manifest.json`. Pass
+`--manifest <path>` to be explicit, `--out <path>` to change the destination
+(default `events-catalog.json`).
+
+The manifest is indexed by element ("what does this tag fire?"); the catalog
+inverts it to be indexed by event ("which tags fire this name?"). That
+inversion is what makes `shared` computable — a name reachable from more than
+one tag is exactly one a listener on a common ancestor can't attribute:
 
 ```json
 [
@@ -303,9 +286,33 @@ entry in `tags`, which is exactly what produces the `shared` flag:
 ]
 ```
 
-The same file works in both places — pass it to the MCP server with
+The output is sorted, so regenerating an unchanged manifest is a no-op in your
+diff. The same file works in both places — pass it to the MCP server with
 `--catalog`, or import it in `.storybook/preview.ts` as
 `parameters.eventsInspector.catalog`.
+
+### Setup CLI
+
+The same command scaffolds the rest of the wiring:
+
+```sh
+npx storybook-events-inspector-setup          # all three steps
+npx storybook-events-inspector-setup catalog  # just the catalog
+npx storybook-events-inspector-setup mcp      # register the server in .mcp.json
+npx storybook-events-inspector-setup skill    # write a .claude/skills skill
+```
+
+- **`mcp`** merges into an existing `.mcp.json` rather than replacing it,
+  leaves any other servers alone, and won't re-register itself without
+  `--force`. Takes `--storybook-url` and `--config`.
+- **`skill`** writes `.claude/skills/storybook-events/SKILL.md` — the
+  diagnostic loop, and what each flag implies as a fix (which of the four to
+  believe first, and why an empty log after a click often isn't a bug). Skills
+  aren't discoverable from `node_modules`, which is why it's written into your
+  repo rather than shipped inside the package. Takes `--dir`.
+
+Nothing is overwritten without `--force`, and every path it touches is printed.
+Run `--help` for the full list.
 
 ### Tools
 

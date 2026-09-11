@@ -1,6 +1,6 @@
 {
   "name": "storybook-events-inspector",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "A Storybook panel (and standalone MCP server) that captures every custom event dispatched in a story with zero registration, flags shared names/retargeted origins/undocumented/not-composed events, and can dispatch a synthetic event back into the canvas.",
   "keywords": [
     "storybook-addon",
@@ -13,7 +13,7 @@
   "author": "Drew Garman <garman.andrew@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Nubville/storybook-events-inspector.git"
+    "url": "git+https://github.com/Nubville/storybook-events-inspector.git"
   },
   "homepage": "https://github.com/Nubville/storybook-events-inspector#readme",
   "bugs": "https://github.com/Nubville/storybook-events-inspector/issues",
@@ -31,7 +31,8 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "storybook-events-inspector-mcp": "./dist/server.js"
+    "storybook-events-inspector-mcp": "./dist/server.js",
+    "storybook-events-inspector-setup": "./dist/setup.js"
   },
   "files": [
     "dist/**/*",
@@ -115,6 +116,9 @@
     ],
     "mcpEntries": [
       "src/mcp/server.ts"
+    ],
+    "cliEntries": [
+      "src/cli/setup.ts"
     ]
   },
   "storybook": {
