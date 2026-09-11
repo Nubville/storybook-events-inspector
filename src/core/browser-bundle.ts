@@ -39,7 +39,7 @@ function toLogEntry(captured: CapturedEvent): LogEntry {
     origin: describe(captured.origin),
     target: describe(captured.externalTarget),
     retargeted: captured.origin !== captured.externalTarget,
-    notComposed: !captured.composed,
+    notComposed: !captured.composed && captured.inShadowTree,
     detail: safeDetail(captured.detail),
   };
 }

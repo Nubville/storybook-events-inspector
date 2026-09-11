@@ -8,7 +8,11 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { chromium, type Browser, type Page } from 'playwright';
+// Type-only, so it erases at compile time and never becomes a runtime
+// require. The actual `chromium` import is deferred to `getPage()` below —
+// playwright is an optional peer dependency, and a static import here would
+// be hoisted above the preflight check that explains how to install it.
+import type { Browser, Page } from 'playwright';
 
 import { indexCatalog } from '../core/catalog';
 import type { DispatchOptions, DispatchResult, EventCatalogEntry, LogEntry } from '../core/types';
@@ -44,6 +48,17 @@ export class Session {
   private entries: AnnotatedLogEntry[] = [];
   private currentStoryId: string | null = null;
   private readonly byName: ReadonlyMap<string, readonly string[]>;
+  /**
+   * Sequence numbers are assigned here, on receipt, and never reset for the
+   * life of the server — NOT taken from the injected bundle's own counter.
+   * That counter is a module global in the page, so it restarts at 0 on every
+   * navigation; a caller holding a `sinceSeq` from before an `open_story`
+   * would then be told `[]` — "nothing fired" — while events were in fact
+   * arriving under seq numbers it had already seen. A silent wrong answer is
+   * the worst failure mode for a tool an agent reasons from, so the cursor is
+   * owned by the one thing that outlives the page: this session.
+   */
+  private nextSeq = 0;
 
   constructor(
     private readonly storybookUrl: string,
@@ -57,6 +72,7 @@ export class Session {
     const tags = this.byName.get(entry.name);
     return {
       ...entry,
+      seq: this.nextSeq++,
       undocumented: !tags,
       shared: (tags?.length ?? 0) > 1,
       sharedWith: (tags ?? []).filter((tag) => tag !== entry.origin),
@@ -65,6 +81,7 @@ export class Session {
 
   private async getPage(): Promise<Page> {
     if (this.page) return this.page;
+    const { chromium } = await import('playwright');
     this.browser = await chromium.launch();
     const page = await this.browser.newPage();
     // Registered once; Playwright re-applies both on every subsequent
@@ -112,9 +129,21 @@ export class Session {
 
     this.currentStoryId = storyId;
     this.entries = [];
+    // The bundle has been capturing since document start (addInitScript), so
+    // anything the story dispatched while rendering — a `connectedCallback`
+    // event, say — is buffered and replayed into this subscriber rather than
+    // lost to the gap between navigation and subscription.
     await page.evaluate(() => {
       window.__eventsInspector?.start((entry) => window.__reportEntry?.(entry));
     });
+    // Let the buffered replay finish crossing the exposeFunction boundary
+    // before the caller's first get_events.
+    await page.waitForTimeout(50);
+  }
+
+  /** The cursor a caller should pass as `sinceSeq` to get only what arrives from now on. */
+  seqBaseline(): number {
+    return this.nextSeq - 1;
   }
 
   private requireStoryOpen(): string {

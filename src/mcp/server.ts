@@ -9,12 +9,23 @@
  * Usage: storybook-events-inspector-mcp [--storybook-url <url>] [--catalog <path.json>]
  */
 import { readFileSync } from 'node:fs';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { z } from 'zod';
 
 import type { EventCatalogEntry } from '../core/types';
+import { assertDependencies } from './preflight';
 import { Session } from './session';
+
+// The MCP SDK, zod and playwright are optional peer dependencies (see
+// `preflight.ts`), so check they're actually installed before touching them
+// and reach for them with `await import` rather than a static import — a
+// static one would hoist above this call and fail with a raw module-not-found
+// stack instead of an explanation.
+assertDependencies();
+
+const [{ McpServer }, { StdioServerTransport }, { z }] = await Promise.all([
+  import('@modelcontextprotocol/sdk/server/mcp.js'),
+  import('@modelcontextprotocol/sdk/server/stdio.js'),
+  import('zod'),
+]);
 
 function parseArgs(argv: readonly string[]): { storybookUrl: string; catalogPath?: string } {
   let storybookUrl = 'http://localhost:6006';
@@ -79,12 +90,23 @@ server.registerTool(
   {
     title: 'Open a story',
     description:
-      'Load a story by id in a real (headless) browser and start capturing every custom event it dispatches from here on. Clears any previously captured events. Call this before click, dispatch_event, or get_events.',
+      'Load a story by id in a real (headless) browser and start capturing every custom event it dispatches, including any dispatched while the story itself is rendering (e.g. from connectedCallback). Clears any previously captured events, and reports the sinceSeq cursor to use from here on. Call this before click, dispatch_event, or get_events.',
     inputSchema: { storyId: z.string().describe("A story id from list_stories, e.g. 'demo--buttons'.") },
   },
   async ({ storyId }) => {
     await session.openStory(storyId);
-    return { content: [{ type: 'text', text: `Opened ${storyId}. Capturing events.` }] };
+    const captured = session.getEvents().length;
+    return {
+      content: [
+        {
+          type: 'text',
+          text:
+            `Opened ${storyId}. Capturing events.` +
+            (captured > 0 ? ` ${captured} event(s) already fired while the story rendered.` : '') +
+            ` Pass sinceSeq: ${session.seqBaseline()} to get_events for only what happens from here on.`,
+        },
+      ],
+    };
   },
 );
 
@@ -126,7 +148,7 @@ server.registerTool(
   {
     title: 'Get captured events',
     description:
-      'Everything captured in the open story so far, newest last: name, the tag that actually dispatched it, its detail, and flags (undocumented/shared/retargeted/notComposed). Pass sinceSeq (from a previous response) to get only what arrived after it.',
+      'Everything captured in the open story so far, newest last: name, the target that actually dispatched it, its detail, and flags (undocumented/shared/retargeted/notComposed). Pass sinceSeq (from a previous response, or from open_story) to get only what arrived after it; seq numbers increase for the life of the server, so a cursor stays valid across open_story calls.',
     inputSchema: { sinceSeq: z.number().optional().describe('Only return events with seq greater than this.') },
   },
   async ({ sinceSeq }) => {

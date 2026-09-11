@@ -22,10 +22,23 @@ export interface EventCatalogEntry {
  */
 export interface CapturedEvent {
   readonly type: string;
-  readonly origin: Element;
+  /**
+   * What called `.dispatchEvent()`. Usually an `Element`, but `document`,
+   * `window` and bare `EventTarget` subclasses (event buses) dispatch custom
+   * events too, and all of them are captured.
+   */
+  readonly origin: EventTarget;
   /** What an external listener (outside every shadow root involved) would see as `event.target`. */
-  readonly externalTarget: Element;
+  readonly externalTarget: EventTarget;
   readonly composed: boolean;
+  /**
+   * Whether the origin sits inside a shadow root. This is what makes
+   * `composed: false` a bug rather than a detail: an event dispatched from
+   * the light DOM reaches the host app with or without `composed`, and
+   * `document`/`window`/an event bus have no shadow boundary to be trapped
+   * behind at all.
+   */
+  readonly inShadowTree: boolean;
   readonly detail: unknown;
 }
 
@@ -34,12 +47,16 @@ export interface LogEntry {
   readonly seq: number;
   readonly time: string;
   readonly name: string;
-  /** The element that actually dispatched, described as a tag name. */
+  /** What actually dispatched: a tag name, or `document`/`window`/an event bus class name. */
   readonly origin: string;
   /** What a plain `event.target` handler would have seen, described as a tag name. */
   readonly target: string;
   readonly retargeted: boolean;
-  /** Never left its shadow root — invisible to anything outside it, including the host app. */
+  /**
+   * Dispatched `composed: false` from *inside a shadow root*, so it never left
+   * it — invisible to anything outside, including the host app. Not set for a
+   * light-DOM or non-Element dispatch, where `composed` changes nothing.
+   */
   readonly notComposed: boolean;
   /** Pre-serialized (may have started as elements/cycles the receiving UI can't touch). */
   readonly detail: unknown;

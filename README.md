@@ -1,6 +1,6 @@
 # storybook-events-inspector
 
-A Storybook panel for design systems whose public API *is* their events: a
+A Storybook panel for design systems whose public API _is_ their events: a
 component fires one event, the host owns the workflow. That means "is this
 thing working?" is almost always "did it fire, and with what?" — a question
 the browser gives you no good way to ask, and that a story-embedded debug
@@ -9,17 +9,21 @@ element only answers for stories someone remembered to add it to.
 This addon answers it globally, with zero markup and **zero registration**,
 for every story:
 
-- **Capture** — sees every custom event any element dispatches, automatically.
-  No catalog required to see something; a catalog is optional annotation on
-  top of a stream that's already complete (see [How it works](#how-it-works)).
+- **Capture** — sees every custom event any target dispatches, automatically:
+  elements, `document`, `window`, and bare `EventTarget` subclasses (the usual
+  shape of an event bus). Including events dispatched while the component is
+  still rendering, from `connectedCallback` or Lit's `firstUpdated`. No catalog
+  required to see something; a catalog is optional annotation on top of a
+  stream that's already complete (see [How it works](#how-it-works)).
 - **Flags four traps that cost hours when hit blind**: an event dispatched
-  without `composed: true`, so it never left its shadow root and is invisible
-  to the *entire host app*, not just this panel (`not composed`) — a name
+  from inside a shadow root without `composed: true`, so it never left that
+  root and is invisible to the _entire host app_, not just this panel
+  (`not composed`) — a name
   declared by more than one tag (`shared`) — `event.target` not matching the
   true dispatch origin because a composed event crossed a shadow boundary
   (`retargeted`) — and an event that fired but isn't in your catalog at all
   (`undocumented`).
-- **Dispatch** — the reverse direction. Fire a synthetic event *at* the
+- **Dispatch** — the reverse direction. Fire a synthetic event _at_ the
   rendered component from the panel, to check it responds the way its docs
   claim, without writing a throwaway `play` function. The dispatch itself
   shows up in the log too, like anything else.
@@ -94,14 +98,15 @@ override the project default.
 
 ### Parameters (`parameters.eventsInspector`)
 
-| Key         | Type                    | Default           | Effect                                                                    |
-| ----------- | ----------------------- | ------------------ | -------------------------------------------------------------------------- |
-| `catalog`   | `{ name, tags[] }[]`    | `[]`                | Annotates captured events with `shared`/`undocumented`. Doesn't gate capture. |
-| `filter`    | `string[]`              | `[]` (everything)   | Narrows the capture stream to just these names.                            |
-| `extra`     | `string[]`              | `[]`                | Adds names back on top of a non-empty `filter`. No-op when `filter` is empty. |
-| `maxEvents` | `number`                | `100`               | Rows kept in the panel before older ones drop.                             |
-| `compact`   | `boolean`               | `false`             | Hide the detail column.                                                    |
-| `label`     | `string`                | `'Events inspector'` | Panel heading.                                                              |
+| Key           | Type                 | Default              | Effect                                                                                                 |
+| ------------- | -------------------- | -------------------- | ------------------------------------------------------------------------------------------------------ |
+| `catalog`     | `{ name, tags[] }[]` | `[]`                 | Annotates captured events with `shared`/`undocumented`. Doesn't gate capture.                          |
+| `filter`      | `string[]`           | `[]` (everything)    | Narrows the capture stream to just these names.                                                        |
+| `catalogOnly` | `boolean`            | `false`              | Derives `filter` from the catalog's own names, so you don't repeat them. Ignored when `filter` is set. |
+| `extra`       | `string[]`           | `[]`                 | Adds names back on top of a non-empty `filter`. No-op when `filter` is empty.                          |
+| `maxEvents`   | `number`             | `100`                | Rows kept in the panel before older ones drop.                                                         |
+| `compact`     | `boolean`            | `false`              | Hide the detail column.                                                                                |
+| `label`       | `string`             | `'Events inspector'` | Panel heading.                                                                                         |
 
 ## How it works
 
@@ -127,7 +132,21 @@ Two things fall out of intercepting the call site instead of listening on
   leaves its shadow root. Intercepting the dispatch call itself sees it
   regardless — which is how the `not composed` flag exists at all, and it's
   arguably the single highest-value one: that bug makes an event invisible to
-  the *entire host app*, not just this tool.
+  the _entire host app_, not just this tool. The flag is only raised when the
+  origin is genuinely inside a shadow tree: from the light DOM, or from
+  `document`/`window`/an event bus, `composed` changes nothing and flagging it
+  would be a false alarm.
+
+Two further consequences of owning the choke point:
+
+- **Every `EventTarget` counts, not just elements.** A design system routinely
+  dispatches app-level events (`theme-change`, `toast-show`) on `document`, and
+  an event bus is often a bare `EventTarget` subclass. Those are captured too,
+  and read in the log as `document` / `window` / the bus's class name.
+- **Capture starts at module load, not at first subscribe.** Events dispatched
+  before a panel (or the MCP session) is listening are buffered and handed to
+  the first subscriber, so a component that fires from `connectedCallback`
+  still shows up instead of being lost to the startup gap.
 
 ### Core vs. adapter
 
@@ -155,7 +174,7 @@ src/mcp/                MCP server adapter: session.ts drives a headless browser
 just a promise: it reuses `inspector.ts`, `dispatch.ts`, and `catalog.ts`
 completely unchanged, against a page that never loads the Storybook manager at
 all. The same bundle could equally back a bookmarklet or a browser-extension
-content script on a *live, deployed* page — catching real user flows, not
+content script on a _live, deployed_ page — catching real user flows, not
 just what a Storybook interaction test exercises.
 
 **What this deliberately doesn't cover**: framework-level reactivity (Lit
@@ -178,19 +197,33 @@ callable by an agent.
 
 ### Setup
 
+The server's runtime dependencies are **optional peer dependencies**, so
+installing this package for its Storybook panel alone doesn't pull down
+Playwright and a browser binary the panel never uses. Install them when you
+want the MCP server:
+
+```sh
+npm install --save-dev @modelcontextprotocol/sdk playwright zod
+npx playwright install chromium
+```
+
+(Run the server without them and it prints exactly that, rather than failing
+with a module-resolution stack trace.)
+
 ```jsonc
 // .mcp.json (project-level MCP config, e.g. for Claude Code)
 {
   "mcpServers": {
     "storybook-events-inspector": {
-      "command": "npx",
+      "command": "storybook-events-inspector-mcp",
       "args": [
-        "storybook-events-inspector-mcp",
-        "--storybook-url", "http://localhost:6006",
-        "--catalog", "./custom-elements-catalog.json" // optional
-      ]
-    }
-  }
+        "--storybook-url",
+        "http://localhost:6006",
+        "--catalog",
+        "./custom-elements-catalog.json", // optional
+      ],
+    },
+  },
 }
 ```
 
@@ -206,14 +239,14 @@ Storybook itself.
 
 ### Tools
 
-| Tool | Does |
-| --- | --- |
-| `list_stories` | Every story in the running Storybook, so an agent can find an id without guessing. |
-| `open_story` | Load a story by id and start capturing. Validates the id against the real index first — a typo'd id fails clearly instead of silently loading Storybook's own "not found" page. |
-| `click` | Click a real element by CSS selector and let whatever it fires get captured naturally — "open the menu, see it respond," run by an agent instead of a human. |
-| `dispatch_event` | The reverse direction: fire a synthetic event at the story's rendered element without a UI trigger to click. Also captured, like anything else. |
-| `get_events` | Everything captured so far — name, origin tag, detail, and the same flags the panel shows (`undocumented`/`shared`/`retargeted`/`notComposed`). |
-| `clear_events` | Empty the buffer without reloading the story. |
+| Tool             | Does                                                                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_stories`   | Every story in the running Storybook, so an agent can find an id without guessing.                                                                                              |
+| `open_story`     | Load a story by id and start capturing. Validates the id against the real index first — a typo'd id fails clearly instead of silently loading Storybook's own "not found" page. |
+| `click`          | Click a real element by CSS selector and let whatever it fires get captured naturally — "open the menu, see it respond," run by an agent instead of a human.                    |
+| `dispatch_event` | The reverse direction: fire a synthetic event at the story's rendered element without a UI trigger to click. Also captured, like anything else.                                 |
+| `get_events`     | Everything captured so far — name, origin tag, detail, and the same flags the panel shows (`undocumented`/`shared`/`retargeted`/`notComposed`).                                 |
+| `clear_events`   | Empty the buffer without reloading the story.                                                                                                                                   |
 
 Each tool's own `description` (what an agent actually reads to decide when to
 use it) has more detail and an example than this table — see `src/mcp/server.ts`.
@@ -259,6 +292,7 @@ the dispatch round-trip:
 ```sh
 pnpm install
 pnpm build          # compile src/manager.tsx, src/preview.ts → dist/
+pnpm test           # unit tests for src/core/ (vitest + jsdom)
 pnpm storybook      # http://localhost:6006 — see "Demo" in the sidebar
 ```
 
@@ -268,22 +302,34 @@ pnpm storybook      # http://localhost:6006 — see "Demo" in the sidebar
   flagged `undocumented`.
 - **`Demo/Narrowed`** — same fixtures, `filter: ['demo-change']` set, so
   `demo-secret` from a shift-click is captured but not shown.
+- **`Demo/ScopedToCatalog`** — `catalogOnly: true`, deriving the same narrowing
+  from the catalog's own names instead of a hand-maintained `filter` array.
 - **`Demo/ToggleOnly`** — a single element alone in the canvas, for trying the
   panel's Dispatch form against it directly.
 
 ## Status
 
-Young — built to validate the idea, not yet published. Metadata in
-`package.json` (`author`, `repository`, GitHub Actions release workflow) is
-still templated from the addon-kit and needs filling in before a real release.
+Young — the idea and the first release both landed the same week. `src/core/`
+is covered by unit tests (`pnpm test`); the Storybook panel and the MCP server
+are verified by hand against a real Storybook.
 
-One thing worth reconsidering before a real release: the MCP server pulls in
-Playwright (a genuinely heavy dependency — it downloads browser binaries) as
-a dependency of this *same* package, so installing the addon for its
-Storybook panel alone currently drags that along too. Splitting the MCP
-server into its own package (`storybook-events-inspector-mcp`, depending on this one
-for `core/`) before publishing would avoid forcing that weight on someone who
-only wants the panel.
+Known gaps, in the order they're worth closing:
+
+- `safeDetail` flattens `Error`, `Map` and `Set` to `{}`, losing an error's
+  message — the most useful thing a failing payload carries. (Placeholder
+  tests are already in `src/core/safeDetail.test.ts`.)
+- The panel keeps its log in `useAddonState`, which syncs the whole array over
+  the manager/preview channel on every captured event. A manager-local store
+  read by both the panel and its tab title would do the same job with no
+  channel traffic.
+- `peerDependencies` on `storybook` is `*` while the code imports
+  `storybook/internal/*`; it should be pinned to the majors actually supported.
+- Dev dependencies float on the `next` tag, so a fresh clone doesn't reproduce
+  the committed lockfile.
+- The MCP server and the Storybook panel ship as one package. They're siblings
+  over the same `core/`, not parent and child, and splitting them would only
+  buy back a zero-install `npx` invocation — worth revisiting if the server
+  ever wants its own release cadence.
 
 ## Contributing
 
