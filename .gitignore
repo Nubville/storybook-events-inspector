@@ -6,3 +6,9 @@ build-storybook.log
 .env
 .eslintcache
 coverage/
+
+# Present on disk but can't be pushed until the local `gh` token has the
+# `workflow` OAuth scope (`gh auth refresh -s workflow`) — see CLAUDE.md.
+# Gitignored rather than left untracked so `git status`/`auto shipit`'s
+# clean-working-directory check don't trip on them.
+.github/workflows/
