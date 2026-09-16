@@ -24,6 +24,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.6.2)
+      '@storybook/addon-a11y':
+        specifier: ^10.6.0
+        version: 10.6.0(storybook@10.6.0(@types/react@18.3.26)(prettier@3.6.2)(react@18.3.1))
       '@storybook/addon-docs':
         specifier: ^10.6.0
         version: 10.6.0(@types/react-dom@18.3.7(@types/react@18.3.26))(@types/react@18.3.26)(storybook@10.6.0(@types/react@18.3.26)(prettier@3.6.2)(react@18.3.1))
@@ -992,6 +995,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@storybook/addon-a11y@10.6.0':
+    resolution: {integrity: sha512-Z/CZor/F8H74/+IoeLroEQXQoVxvmjVtUgATJ95KPBolHxMaHLXLsYU0wosIiiORxmfRCnpen5pQl1n4+pBWQw==}
+    peerDependencies:
+      storybook: ^10.6.0
+
   '@storybook/addon-docs@10.6.0':
     resolution: {integrity: sha512-Fk3rUQWeGyCfL170OkmRp6Ruyv7MHPb/xrKa6YNk7FlGmlVLi5tKzh2T/0J13vWEy8wiu2MV3IBu8iRsaUR+Cw==}
     peerDependencies:
@@ -1461,6 +1469,10 @@ packages:
   await-to-js@3.0.0:
     resolution: {integrity: sha512-zJAaP9zxTcvTHRlejau3ZOY4V7SRpiByf3/dxx2uyKxxor19tpmpV2QRsTKikckwhaPmr2dVpxxMr7jOCYVp5g==}
     engines: {node: '>=6.0.0'}
+
+  axe-core@4.13.0:
+    resolution: {integrity: sha512-UzGt8zg7Ny8djbYMhxl2zuEevVa7r2gJjYY5Lwr1xM7+XU2nd6CkIWFTVcCIbAP63vSz71NaVyyuSk9lHKcy0A==}
+    engines: {node: '>=4'}
 
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
@@ -5106,6 +5118,12 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.52.5':
     optional: true
 
+  '@storybook/addon-a11y@10.6.0(storybook@10.6.0(@types/react@18.3.26)(prettier@3.6.2)(react@18.3.1))':
+    dependencies:
+      '@storybook/global': 5.0.0
+      axe-core: 4.13.0
+      storybook: 10.6.0(@types/react@18.3.26)(prettier@3.6.2)(react@18.3.1)
+
   '@storybook/addon-docs@10.6.0(@types/react-dom@18.3.7(@types/react@18.3.26))(@types/react@18.3.26)(storybook@10.6.0(@types/react@18.3.26)(prettier@3.6.2)(react@18.3.1))':
     dependencies:
       '@mdx-js/react': 3.1.1(@types/react@18.3.26)(react@18.3.1)
@@ -5680,6 +5698,8 @@ snapshots:
       possible-typed-array-names: 1.1.0
 
   await-to-js@3.0.0: {}
+
+  axe-core@4.13.0: {}
 
   balanced-match@1.0.2: {}
 
