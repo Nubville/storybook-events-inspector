@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { ActionBar, AddonPanel, Collapsible, EmptyTabContent, ScrollArea } from 'storybook/internal/components';
 import { useChannel, useParameter, useStorybookState } from 'storybook/manager-api';
 import { styled, useTheme } from 'storybook/theming';
+import { ChevronSmallDownIcon } from '@storybook/icons';
 import { ObjectInspector } from 'react-inspector';
 
 import { ADDON_ID, EVENTS, PANEL_ID, PARAM_KEY } from '../constants';
@@ -30,17 +31,23 @@ const Scroll = styled(ScrollArea)({
 // inspecting its rendered DOM: no role, no handler); `toggleProps` below is
 // meant to be spread onto whatever the caller uses as the actual trigger, and
 // a button is what gives that trigger keyboard support (Enter/Space) for free.
+// Sizing/hover/cursor match the a11y addon's own disclosure row (its per-rule
+// HeaderBar in dist/manager.js) rather than inventing a new look for a
+// primitive — Collapsible ships with none — that has no other real consumer
+// yet: full-bleed clickable bar, same padding, same hover-to-secondary-color.
 const SummaryRow = styled.button(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
+  gap: 6,
   width: '100%',
+  minHeight: 32,
+  padding: '6px 10px',
   fontSize: 12,
   font: 'inherit',
   color: 'inherit',
   background: 'none',
   border: 'none',
-  padding: 0,
   cursor: 'pointer',
   textAlign: 'left',
   ':hover': {
@@ -48,10 +55,24 @@ const SummaryRow = styled.button(({ theme }) => ({
   },
 }));
 
+const SummaryLabel = styled.span({
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+});
+
 const Stats = styled.span(({ theme }) => ({
   color: theme.textMutedColor,
   fontSize: 11,
 }));
+
+// Same rotating-chevron affordance the a11y addon uses on its own expandable
+// rows (ChevronSmallDownIcon rotated -180deg when open, 0deg when closed) —
+// it's what actually signals "click me" for a disclosure like this one.
+const Chevron = styled(ChevronSmallDownIcon)({
+  flexShrink: 0,
+  transition: 'transform 0.1s ease-in-out',
+});
 
 // Rows are full-width blocks (not a fixed-column <table>) so a payload of any
 // shape gets the space it needs — the same reason the built-in Actions addon
@@ -166,7 +187,10 @@ export const Panel: React.FC<PanelProps> = ({ active }) => {
           initialCollapsed
           summary={(state) => (
             <SummaryRow {...state.toggleProps}>
-              <span>Dispatch event</span>
+              <SummaryLabel>
+                <Chevron style={{ transform: `rotate(${state.isCollapsed ? 0 : -180}deg)` }} />
+                <span>Dispatch event</span>
+              </SummaryLabel>
               {stats.length > 0 && <Stats>{stats.join(' · ')}</Stats>}
             </SummaryRow>
           )}
