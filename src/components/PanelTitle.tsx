@@ -1,24 +1,44 @@
-import React, { useSyncExternalStore } from 'react';
-import { useParameter } from 'storybook/manager-api';
+import React from 'react';
+import { Badge } from 'storybook/internal/components';
+import { useParameter, useStorybookApi } from 'storybook/manager-api';
 
-import { PARAM_KEY } from '../constants';
+import { PANEL_ID, PARAM_KEY } from '../constants';
 import type { EventsInspectorParameters } from '../types';
-import { getEntries, subscribe } from './entriesStore';
+import { getUnviewedCount, subscribe } from './entriesStore';
 
 /**
  * The tab's own title, not a toolbar item — a toolbar is for global,
  * view-affecting toggles (background, viewport, zoom); this is a log, the
- * same shape as Actions/Interactions, so it belongs where those live. What
- * IS worth surfacing outside the panel body is a live count, so "did
- * anything fire" is visible without switching tabs.
+ * same shape as Actions/Interactions, so it belongs where those live.
  *
- * Reads the exact same module-level store Panel.tsx writes its entries to
- * (rather than a separately-mirrored count) — one value, so Clear and this
- * title can't drift out of sync with each other. Both components are in the
- * manager bundle, so this needs no channel traffic at all.
+ * Matches the accessibility addon's own tab-badge convention exactly (a
+ * `Badge compact status={...}` next to the label, active-colored while the
+ * tab is the one actually open) rather than a bespoke number-in-the-string —
+ * per direct feedback from a Storybook maintainer. Badges *unviewed* events,
+ * not the running total: the point of a badge is "you should look," which a
+ * count that never goes back down doesn't communicate.
+ *
+ * `api.getSelectedPanel()` exists at runtime but isn't in this version's
+ * public .d.ts (confirmed by reading the accessibility addon's own source,
+ * which calls it the same way) — hence the narrow cast, not a broad `any`.
  */
 export const PanelTitle: React.FC = () => {
-  const entries = useSyncExternalStore(subscribe, getEntries);
+  const api = useStorybookApi() as { getSelectedPanel(): string };
+  const [count, setCount] = React.useState(getUnviewedCount());
+  React.useEffect(() => subscribe(() => setCount(getUnviewedCount())), []);
+
   const label = useParameter<EventsInspectorParameters>(PARAM_KEY, {}).label ?? 'Events inspector';
-  return <span>{entries.length > 0 ? `${label} ${entries.length}` : label}</span>;
+  const badge =
+    count === 0 ? null : (
+      <Badge compact status={api.getSelectedPanel() === PANEL_ID ? 'active' : 'neutral'}>
+        {count}
+      </Badge>
+    );
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span>{label}</span>
+      {badge}
+    </div>
+  );
 };

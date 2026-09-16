@@ -22,6 +22,17 @@ import type { LogEntry } from '../core/types';
 let entries: readonly LogEntry[] = [];
 const listeners = new Set<() => void>();
 
+/**
+ * The seq of the newest entry Panel has shown while its tab was actually
+ * selected, per the accessibility addon's own suggestion for this exact
+ * addon: badge the tab with what's *new*, not the running total, so the
+ * number means "you should look" rather than background noise that never
+ * goes away. `seq` is monotonic for the life of the preview (see preview.ts)
+ * and untouched by Clear or a story switch, so this watermark stays
+ * meaningful across both without needing to reset it explicitly.
+ */
+let lastViewedSeq = -1;
+
 function emitChange(): void {
   for (const listener of listeners) listener();
 }
@@ -55,8 +66,29 @@ export function clearEntries(): void {
   emitChange();
 }
 
+/** Called by Panel whenever its tab is the one actually selected, so new arrivals while open never badge. */
+export function markAllViewed(): void {
+  const latest = entries[0]?.seq;
+  if (latest === undefined || latest === lastViewedSeq) return;
+  lastViewedSeq = latest;
+  emitChange();
+}
+
+/** What PanelTitle badges — entries newer than the last time the panel's tab was actually selected. */
+export function getUnviewedCount(): number {
+  let count = 0;
+  // Newest-first: the moment we reach one at or before the watermark, every
+  // entry after it is older still, so the rest can't be unviewed either.
+  for (const entry of entries) {
+    if (entry.seq <= lastViewedSeq) break;
+    count++;
+  }
+  return count;
+}
+
 /** Test seam: drop all state and subscribers. */
 export function resetForTest(): void {
   entries = [];
+  lastViewedSeq = -1;
   listeners.clear();
 }
