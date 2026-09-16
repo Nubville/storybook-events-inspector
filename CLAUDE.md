@@ -4,31 +4,43 @@ Project-specific operating notes that aren't obvious from the code alone.
 
 ## Releasing
 
-There is no working automated release yet. `auto shipit` (via `pnpm run release`)
-almost always computes `none`/no bump right now — don't trust that output.
+`auto shipit` (via `pnpm run release`) needs `GH_TOKEN` set — `export
+GH_TOKEN=$(gh auth token)` works locally. Two real things had to be fixed before
+it would compute a correct bump at all; both are now fixed, but the second one
+is a standing constraint on how you use it, not a one-time bug:
 
-Root cause: `auto`'s conventional-commits → SEMVER-bump pipeline expects PRs to get
-auto-labeled by a CI workflow on merge, and that workflow has never actually run
-here (see "CI workflow files" below — they're not on GitHub yet). Every version
-bump from 0.1.0 through 0.3.1 was a **manual** edit to `package.json`, not a real
-`auto` run. A `v0.3.1` GitHub Release was backfilled by hand at commit `b8ae224`
-(the commit that introduced that version string) purely so `auto` has *a* baseline
-to diff from — it still won't compute correct bumps until PR auto-labeling works.
+1. **Version mismatch (fixed).** `auto` (the CLI) was pinned to `11.3.0` while
+   `@auto-it/conventional-commits`/`@auto-it/released` were pinned to `11.3.6`,
+   so two separate copies of `@auto-it/core` existed in the tree. All three are
+   now pinned to `^11.3.6` — verify with `pnpm why @auto-it/core` (should show
+   exactly one resolved version) before trusting a bump calculation again.
 
-Until the workflow gap is fixed, release manually:
-1. Check `git log <last-version-commit>..HEAD` yourself and pick the bump by hand
-   using standard semver (this repo's own history treats `feat:` as minor,
-   `fix:`/`perf:`/`chore:` as patch, even pre-1.0 — not the "0.x collapses
-   everything" convention).
-2. Hand-edit `version` in `package.json`.
-3. `pnpm build && pnpm test`.
-4. `npm publish` (confirm `npm whoami` is logged in first).
-5. `git tag vX.Y.Z && git push --tags`, and `gh release create vX.Y.Z` with real
-   notes, so the next release has a correct baseline.
-6. Before assuming "nothing to publish," diff HEAD against the **actual npm
-   registry version** (`npm view storybook-events-inspector version`), not just
-   `package.json` — they can and have drifted apart from unpublished work sitting
-   on `main`.
+2. **`calculateSemVerBump` only inspects the single most-recent commit to decide
+   whether to skip the release entirely** (`@auto-it/core`'s `semver.js`) — it's
+   built for "one `shipit` run per merged PR," where the latest PR's label is
+   the whole signal. It still aggregates the highest bump across every commit
+   since the last release once it decides not to skip, but if HEAD's own commit
+   type maps to the `skip-release` label (`chore:`, `docs:` in this plugin's
+   mapping), the whole run computes `none` — even with a real `feat:`/`fix:`
+   sitting a few commits back. **Before running a release after a batch of
+   commits, make sure HEAD itself is a `feat:`/`fix:`/`perf:` commit** (or land
+   one last such commit right before releasing) — don't trust a `none` result
+   at face value without checking what HEAD's own commit type is first.
+
+There was also no real release history before this was debugged: no git tags, no
+GitHub Releases, no `CHANGELOG.md` — every bump from 0.1.0 through 0.3.1 was a
+manual `package.json` edit. A `v0.3.1` GitHub Release was backfilled by hand at
+commit `b8ae224` (the commit that introduced that version string) so `auto` has
+a real baseline to diff from going forward.
+
+Before assuming "nothing to publish," diff HEAD against the **actual npm
+registry version** (`npm view storybook-events-inspector version`), not just
+`package.json` — they can and have drifted apart from unpublished work sitting
+on `main`.
+
+Separately, `.github/workflows/*.yml` still isn't live on GitHub (see below), so
+none of this runs in CI yet — `pnpm run release` has to be triggered by hand
+until that's fixed.
 
 ## Local dev server
 
