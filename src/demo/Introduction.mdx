@@ -1,0 +1,127 @@
+import { Canvas, Meta } from '@storybook/addon-docs/blocks';
+import * as DemoStories from './demo.stories';
+
+<Meta title="Introduction" />
+
+# Events Inspector
+
+A Storybook panel — and a standalone MCP server — for design systems whose public API *is* their events: a component fires one event, the host owns the workflow. That pattern makes "is this component actually working?" collapse into one question: **did the right event fire, with the right shape, from the right place?** This addon answers it, automatically, for every story, with nothing to register.
+
+Everything on this page is live. Click the examples — the real **Events inspector** panel at the bottom of your screen is reacting to them right now.
+
+## Capture is automatic — there's nothing to register
+
+Every custom event any element dispatches, in Lit, Stencil, or vanilla JS, passes through exactly one platform method: `EventTarget.prototype.dispatchEvent`. This addon patches that once, the same way Redux DevTools has always wrapped `store.dispatch` — total visibility, no catalog required, no per-event registration. You'll see this in every example below: nobody imported a debug component or typed out an event name anywhere.
+
+## The four flags
+
+Each one is a real bug class that costs an hour when you hit it blind. Try them:
+
+<Canvas of={DemoStories.Buttons} />
+
+- **`shared`** — `demo-change` is declared by *both* `demo-button` and `demo-toggle`. A listener bound on a shared ancestor can't tell which one fired without also reading "fired by."
+- **`retargeted`** — the button dispatches from its own internal `<button>`, not itself. `event.target` outside reads the host `demo-button`, but the true origin — what "fired by" shows — is the button underneath. This happens automatically whenever a composed event crosses a shadow boundary.
+- **`undocumented`** — shift-click the button. `demo-secret` isn't declared anywhere in this project's catalog, and still shows up, flagged, because capture was never gated by the catalog in the first place.
+
+The fourth is worth its own example, because it's the one a `window`-listener-based tool structurally cannot show:
+
+<Canvas of={DemoStories.NotComposed} />
+
+- **`notComposed`** — dispatched from inside a shadow root without `composed: true`. It never leaves that shadow root, which means it's invisible to *any* listener outside it — including your real host application, not just this panel. This is almost always the actual bug behind "my listener never fires." The only reason it's visible here at all is that the addon intercepts the `dispatchEvent()` call itself, before propagation even starts.
+
+## The reverse direction: dispatch
+
+Capture answers "what did this component fire." The panel's **Dispatch event** control answers the opposite question — "does this component correctly respond to an event arriving from outside" — without writing a throwaway `play` function:
+
+<Canvas of={DemoStories.ToggleOnly} />
+
+Open **Dispatch event** in the panel, send `demo-command` with a detail like `{"say":"hi"}`, and watch the toggle print what it received. The dispatch itself is captured too, exactly like anything else — you'll see it in the log alongside the toggle's own response.
+
+## Reducing noise: `filter` and `catalogOnly`
+
+Capture is complete by default, which is usually what you want — but a busy story can get loud. `filter` narrows the stream by hand:
+
+<Canvas of={DemoStories.Narrowed} />
+
+`catalogOnly` does the same thing without maintaining a name list yourself — it narrows automatically to whatever your catalog already declares:
+
+<Canvas of={DemoStories.ScopedToCatalog} />
+
+## From a Custom Elements Manifest to a catalog
+
+The catalog is what makes `shared` and `undocumented` mean anything — without one, every event reads `undocumented`, correctly, since nothing's been told what's actually part of the documented surface. A catalog isn't hand-written: it's a direct, inverted projection of a [Custom Elements Manifest](https://custom-elements-manifest.open-wc.org/), which most component-library build tools already generate.
+
+The inversion is the whole point. A manifest is indexed by **element** — "what does this tag fire?" A catalog is indexed by **event** — "which tags fire this name?" That second shape is the only one that makes `shared` computable at all; you can't answer "is this name declared by more than one tag" from a structure organized by tag in the first place.
+
+Concretely, a manifest declaring events on three elements —
+
+```json
+{
+  "modules": [
+    {
+      "declarations": [
+        { "tagName": "demo-button", "events": [{ "name": "demo-change" }] }
+      ]
+    },
+    {
+      "declarations": [
+        { "tagName": "demo-toggle", "events": [{ "name": "demo-change" }] }
+      ]
+    },
+    {
+      "declarations": [
+        { "tagName": "demo-trap", "events": [{ "name": "demo-trapped" }] }
+      ]
+    }
+  ]
+}
+```
+
+inverts into exactly this addon's catalog shape — this is real output, generated from the manifest above, not typed by hand:
+
+```json
+[
+  { "name": "demo-change", "tags": ["demo-button", "demo-toggle"] },
+  { "name": "demo-trapped", "tags": ["demo-trap"] }
+]
+```
+
+`demo-change` already reads as `tags.length > 1` — declared by two elements — which is precisely what makes it flag `shared` the moment either one fires it, in the very first example on this page.
+
+Generating this from your own manifest is one command:
+
+```sh
+npx storybook-events-inspector-setup catalog
+```
+
+It looks for `package.json#customElements` first (the Custom Elements Manifest spec's own pointer), then falls back to conventional paths like `./custom-elements.json`. Run `npx storybook-events-inspector-setup` with no arguments to also wire up the MCP server below and drop in a Claude Code skill, in one pass.
+
+## The MCP server
+
+This addon also ships a second, standalone front door onto the exact same capture-and-dispatch engine — one an AI agent can drive directly, over the [Model Context Protocol](https://modelcontextprotocol.io). It's deliberately separate from Storybook's own official MCP addon: as of writing, that addon has no extension point for a third-party addon to register its own tools, and its component-data toolset doesn't cover web-components projects yet.
+
+The loop is the same one you just ran by hand above, just spoken by an agent instead of clicked by a person:
+
+```
+list_stories                                   → find "demo--toggle-only"
+open_story    { storyId: "demo--toggle-only" }
+click         { selector: "demo-toggle" }
+get_events    {}
+→ [{ name: "demo-change", origin: "demo-toggle", detail: {...}, shared: true, ... }]
+```
+
+Or the reverse direction — checking a component responds to a command event, exactly like the Dispatch example above, but from an agent:
+
+```
+dispatch_event { name: "demo-command", detail: { say: "hi from an agent" } }
+get_events     {}
+→ the dispatch itself, captured like anything else, plus whatever demo-toggle did in response
+```
+
+Register it against your own Storybook with `npx storybook-events-inspector-setup mcp`, or see the README for the full tool reference and a `.mcp.json` example.
+
+## Learn more
+
+- [README](https://github.com/Nubville/storybook-events-inspector#readme) — the full parameter reference, MCP tool list, and the `core/` architecture behind both.
+- [npm package](https://www.npmjs.com/package/storybook-events-inspector)
+- [GitHub](https://github.com/Nubville/storybook-events-inspector) — issues and contributions welcome.

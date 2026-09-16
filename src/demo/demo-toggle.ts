@@ -1,5 +1,7 @@
 import { LitElement, html, css } from 'lit';
 
+import { demoButtonStyles } from './shared-styles';
+
 /**
  * Sandbox-only fixture for this addon's own Storybook, NOT part of the addon.
  *
@@ -15,21 +17,17 @@ import { LitElement, html, css } from 'lit';
  * see demo-button.ts for why.
  */
 export class DemoToggle extends LitElement {
-  static override styles = css`
-    :host {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      font: inherit;
-    }
-    button {
-      font: inherit;
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      border: 1px solid #8883;
-      cursor: pointer;
-    }
-  `;
+  static override styles = [
+    css`
+      :host {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font: inherit;
+      }
+    `,
+    demoButtonStyles,
+  ];
 
   static override properties = {
     checked: { type: Boolean, reflect: true },

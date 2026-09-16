@@ -8,4 +8,5 @@ import type { EventCatalogEntry } from '../types';
 export const DEMO_EVENT_CATALOG: readonly EventCatalogEntry[] = [
   { name: 'demo-change', tags: ['demo-button', 'demo-toggle'] },
   { name: 'demo-command', tags: ['demo-toggle'] },
+  { name: 'demo-trapped', tags: ['demo-trap'] },
 ];

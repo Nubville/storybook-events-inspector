@@ -1,4 +1,6 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html } from 'lit';
+
+import { demoButtonStyles } from './shared-styles';
 
 /**
  * Sandbox-only fixture for this addon's own Storybook, NOT part of the addon.
@@ -15,15 +17,7 @@ import { LitElement, html, css } from 'lit';
  * tsup/tsc, never shipped un-transformed) doesn't have that constraint.
  */
 export class DemoButton extends LitElement {
-  static override styles = css`
-    button {
-      font: inherit;
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      border: 1px solid #8883;
-      cursor: pointer;
-    }
-  `;
+  static override styles = demoButtonStyles;
 
   static override properties = {
     _count: { state: true },

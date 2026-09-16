@@ -10,6 +10,12 @@ const preview: Preview = {
         date: /Date$/,
       },
     },
+    options: {
+      // Introduction first, everything else in the order it's defined.
+      storySort: {
+        order: ['Introduction', '*'],
+      },
+    },
     // Project-wide default for this addon. A story can narrow it further with
     // `parameters.eventsInspector.filter` / `.extra`.
     eventsInspector: {
